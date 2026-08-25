@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Discipline Ledger</title>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg: #14171a;
+    --panel: #1c2024;
+    --panel-2: #21262b;
+    --line: #2c3238;
+    --ink: #ece7dd;
+    --ink-dim: #9aa1a8;
+    --brass: #c9a66b;
+    --brass-dim: #8a7350;
+    --sage: #6fa88a;
+    --sage-dim: #395044;
+    --miss: #3a3f44;
+    --danger: #b5654f;
+    --radius: 10px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;}
+  html,body{
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection{ background: var(--brass); color:#14171a; }
+
+  .wrap{
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 20px 80px;
+  }
+
+  /* ---------- Header ---------- */
+  header{
+    display:flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 16px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 20px;
+    margin-bottom: 26px;
+  }
+  .brand-eyebrow{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--brass);
+    margin: 0 0 6px;
+  }
+  h1{
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 34px;
+    letter-spacing: -0.01em;
+    margin: 0;
+    color: var(--ink);
+  }
+  .sub{
+    font-size: 13px;
+    color: var(--ink-dim);
+    margin-top: 6px;
+    max-width: 46ch;
+  }
+  .month-control{
+    display:flex;
+    align-items:center;
+    gap: 10px;
+    font-family:'IBM Plex Mono', monospace;
+  }
+  .month-control button{
+    width: 30px; height:30px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--panel-2);
+    color: var(--ink);
+    cursor: pointer;
+    font-size: 15px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .month-control button:hover{ border-color: var(--brass); color: var(--brass); }
+  .month-label{
+    font-size: 15px;
+    letter-spacing: 0.03em;
+    min-width: 150px;
+    text-align:center;
+  }
+
+  /* ---------- Stat strip ---------- */
+  .stats{
+    display:grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 26px;
+  }
+  .stat{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+  .stat .num{
+    font-family:'Space Grotesk', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--brass);
+    line-height: 1;
+  }
+  .stat .lbl{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-top: 6px;
+  }
+
+  /* ---------- Grid panel ---------- */
+  .panel{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-bottom: 22px;
+    overflow-x: auto;
+  }
+  .panel h2{
+    font-family:'Space Grotesk', sans-serif;
+    font-size: 15px;
+    margin: 0 0 14px;
+    color: var(--ink);
+    display:flex; align-items:center; gap:8px;
+  }
+  .panel h2 .n{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    color: var(--brass-dim);
+    letter-spacing: 0.08em;
+  }
+
+  table.grid{
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 760px;
+  }
+  table.grid th, table.grid td{
+    text-align: center;
+    padding: 0;
+  }
+  .habit-col{
+    text-align:left !important;
+    padding: 8px 10px !important;
+    font-size: 13px;
+    white-space: nowrap;
+    position: sticky;
+    left: 0;
+    background: var(--panel);
+    z-index: 2;
+    border-right: 1px solid var(--line);
+    min-width: 190px;
+  }
+  .habit-col .streak{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--brass);
+    margin-left: 6px;
+  }
+  .habit-col .rm{
+    float:right;
+    color: var(--ink-dim);
+    cursor:pointer;
+    font-size: 12px;
+    opacity: 0;
+    transition: opacity .15s;
+  }
+  tr:hover .rm{ opacity: 1; }
+  .habit-col .rm:hover{ color: var(--danger); }
+
+  .day-head{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    color: var(--ink-dim);
+    width: 26px;
+    padding: 6px 0 !important;
+    border-bottom: 1px solid var(--line);
+  }
+  .day-head.today{ color: var(--brass); font-weight:700; }
+  .day-head.weekend{ color: #b08a5c; }
+
+  .cell{
+    width: 26px; height: 30px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--line);
+  }
+  .cell .box{
+    width: 18px; height: 18px;
+    margin: 0 auto;
+    border-radius: 4px;
+    border: 1px solid var(--miss);
+    background: transparent;
+    transition: all .12s ease;
+  }
+  .cell.today .box{ border-color: var(--brass-dim); }
+  .cell.done .box{
+    background: var(--sage);
+    border-color: var(--sage);
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.15);
+  }
+  .cell:active .box{ transform: scale(0.85); }
+  .cell.future{ cursor: default; }
+  .cell.future .box{ opacity: 0.3; }
+
+  tr.total-row td{ padding-top: 10px; }
+  .total-row .habit-col{ font-weight: 600; color: var(--brass); font-size: 12px; }
+  .total-row .pct{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-dim);
+    padding-top: 4px;
+  }
+
+  /* ---------- Add habit ---------- */
+  .add-row{
+    display:flex;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .add-row input{
+    flex:1;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    border-radius: 6px;
+    padding: 9px 12px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+  }
+  .add-row input:focus{ outline: none; border-color: var(--brass); }
+  .add-row button{
+    background: var(--brass);
+    color: #14171a;
+    border: none;
+    border-radius: 6px;
+    padding: 0 16px;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .add-row button:hover{ background: #dabb85; }
+
+  /* ---------- Charts ---------- */
+  .charts{
+    display:grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 18px;
+  }
+  @media (max-width: 800px){ .charts{ grid-template-columns: 1fr; } }
+  .chart-box{ height: 220px; position: relative; }
+
+  footer{
+    margin-top: 28px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-dim);
+    text-align: center;
+  }
+  footer .flame{ color: var(--brass); }
+
+  .loading-note{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-dim);
+    margin-bottom: 14px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <p class="brand-eyebrow">Self&#8209;Mastery / Daily Ledger</p>
+      <h1>Discipline Ledger</h1>
+      <p class="sub">Mark what you did today. The streak is the only opponent.</p>
+    </div>
+    <div class="month-control">
+      <button id="prevMonth">&#8592;</button>
+      <div class="month-label" id="monthLabel">—</div>
+      <button id="nextMonth">&#8594;</button>
+    </div>
+  </header>
+
+  <div class="stats" id="statStrip"></div>
+
+  <div class="panel">
+    <h2>This month <span class="n" id="rangeNote"></span></h2>
+    <p class="loading-note" id="loadingNote">loading your ledger…</p>
+    <table class="grid" id="gridTable" style="display:none;"></table>
+    <div class="add-row">
+      <input id="newHabitInput" type="text" placeholder="Add a new habit…" maxlength="40">
+      <button id="addHabitBtn">Add</button>
+    </div>
+  </div>
+
+  <div class="charts">
+    <div class="panel">
+      <h2>Daily completion <span class="n">% of habits done, per day</span></h2>
+      <div class="chart-box"><canvas id="lineChart"></canvas></div>
+    </div>
+    <div class="panel">
+      <h2>Totals by habit <span class="n">this month</span></h2>
+      <div class="chart-box"><canvas id="barChart"></canvas></div>
+    </div>
+  </div>
+
+  <footer><span class="flame">&#9670;</span> Saved automatically to your device. Only you can see this ledger.</footer>
+</div>
+
+<script>
+(function(){
+  const DEFAULT_HABITS = [
+    "Skin care",
+    "Exercise",
+    "Apply medicine",
+    "Study something new",
+    "40 push-ups",
+    "40 sit-ups",
+    "Read book",
+    "Stay calm in bad situations",
+    "Bath",
+    "No smoking",
+    "No masturbation"
+  ];
+
+  let habits = DEFAULT_HABITS.slice();
+  let current = new Date();
+  current.setDate(1);
+  let monthData = {}; // { "habitIndex-day": true }
+  let lineChart, barChart;
+
+  const monthLabel = document.getElementById('monthLabel');
+  const gridTable = document.getElementById('gridTable');
+  const loadingNote = document.getElementById('loadingNote');
+  const statStrip = document.getElementById('statStrip');
+  const rangeNote = document.getElementById('rangeNote');
+
+  function monthKey(d){
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+  }
+  function daysInMonth(d){
+    return new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+  }
+  function isToday(d, day){
+    const t = new Date();
+    return t.getFullYear()===d.getFullYear() && t.getMonth()===d.getMonth() && t.getDate()===day;
+  }
+  function isFuture(d, day){
+    const t = new Date(); t.setHours(0,0,0,0);
+    const cellDate = new Date(d.getFullYear(), d.getMonth(), day);
+    return cellDate > t;
+  }
+
+  async function loadHabitList(){
+    try{
+      const res = await window.storage.get('habit-list', false);
+      if(res && res.value){
+        const parsed = JSON.parse(res.value);
+        if(Array.isArray(parsed) && parsed.length) habits = parsed;
+      }
+    }catch(e){ /* first run, use defaults */ }
+  }
+  async function saveHabitList(){
+    try{ await window.storage.set('habit-list', JSON.stringify(habits), false); }
+    catch(e){ console.error('save habit list failed', e); }
+  }
+
+  async function loadMonth(){
+    loadingNote.style.display = 'block';
+    gridTable.style.display = 'none';
+    const key = 'entries:' + monthKey(current);
+    try{
+      const res = await window.storage.get(key, false);
+      monthData = (res && res.value) ? JSON.parse(res.value) : {};
+    }catch(e){
+      monthData = {};
+    }
+    loadingNote.style.display = 'none';
+    gridTable.style.display = '';
+  }
+  async function saveMonth(){
+    const key = 'entries:' + monthKey(current);
+    try{ await window.storage.set(key, JSON.stringify(monthData), false); }
+    catch(e){ console.error('save entries failed', e); }
+  }
+
+  function streakFor(hIdx){
+    // count backward from today (or month end if viewing past month) through consecutive done days
+    const nd = daysInMonth(current);
+    const t = new Date(); t.setHours(0,0,0,0);
+    const viewingCurrentMonth = t.getFullYear()===current.getFullYear() && t.getMonth()===current.getMonth();
+    let day = viewingCurrentMonth ? t.getDate() : nd;
+    let streak = 0;
+    while(day >= 1){
+      if(monthData[hIdx+'-'+day]){ streak++; day--; }
+      else break;
+    }
+    return streak;
+  }
+
+  function render(){
+    monthLabel.textContent = current.toLocaleDateString('en-US', { month:'long', year:'numeric' });
+    const nd = daysInMonth(current);
+    rangeNote.textContent = '1–' + nd;
+
+    let html = '<thead><tr><th class="habit-col">Habit</th>';
+    for(let day=1; day<=nd; day++){
+      const dow = new Date(current.getFullYear(), current.getMonth(), day).getDay();
+      const weekend = (dow===0 || dow===6);
+      const today = isToday(current, day);
+      html += `<th class="day-head ${today?'today':''} ${weekend?'weekend':''}">${day}</th>`;
+    }
+    html += '</tr></thead><tbody>';
+
+    habits.forEach((h, hIdx) => {
+      const streak = streakFor(hIdx);
+      html += `<tr><td class="habit-col">${escapeHtml(h)}${streak>0?`<span class="streak">${streak} day streak</span>`:''}<span class="rm" data-h="${hIdx}" title="Remove habit">✕</span></td>`;
+      for(let day=1; day<=nd; day++){
+        const done = !!monthData[hIdx+'-'+day];
+        const fut = isFuture(current, day);
+        const today = isToday(current, day);
+        html += `<td class="cell ${done?'done':''} ${fut?'future':''} ${today?'today':''}" data-h="${hIdx}" data-day="${day}"><div class="box"></div></td>`;
+      }
+      html += '</tr>';
+    });
+
+    // totals row
+    html += `<tr class="total-row"><td class="habit-col">Daily total</td>`;
+    for(let day=1; day<=nd; day++){
+      const doneCount = habits.reduce((acc, _, hIdx) => acc + (monthData[hIdx+'-'+day] ? 1 : 0), 0);
+      const pct = habits.length ? Math.round((doneCount/habits.length)*100) : 0;
+      html += `<td class="pct">${habits.length?pct:0}%</td>`;
+    }
+    html += '</tr>';
+
+    html += '</tbody>';
+    gridTable.innerHTML = html;
+
+    attachCellHandlers();
+    renderStats(nd);
+    renderCharts(nd);
+  }
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function attachCellHandlers(){
+    gridTable.querySelectorAll('.cell').forEach(cell => {
+      if(cell.classList.contains('future')) return;
+      cell.addEventListener('click', async () => {
+        const hIdx = cell.dataset.h;
+        const day = cell.dataset.day;
+        const key = hIdx+'-'+day;
+        if(monthData[key]) delete monthData[key];
+        else monthData[key] = true;
+        cell.classList.toggle('done');
+        await saveMonth();
+        renderStats(daysInMonth(current));
+        renderCharts(daysInMonth(current));
+        refreshStreakLabels();
+      });
+    });
+    gridTable.querySelectorAll('.rm').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const hIdx = parseInt(btn.dataset.h, 10);
+        if(!confirm('Remove "' + habits[hIdx] + '" from your habit list?')) return;
+        habits.splice(hIdx, 1);
+        // reindex monthData keys
+        const newData = {};
+        Object.keys(monthData).forEach(k => {
+          const [hi, day] = k.split('-');
+          const hiN = parseInt(hi,10);
+          if(hiN === hIdx) return; // drop entries for removed habit
+          const newHi = hiN > hIdx ? hiN - 1 : hiN;
+          newData[newHi+'-'+day] = monthData[k];
+        });
+        monthData = newData;
+        await saveHabitList();
+        await saveMonth();
+        render();
+      });
+    });
+  }
+
+  function refreshStreakLabels(){
+    gridTable.querySelectorAll('.habit-col').forEach((td, idx) => {
+      if(idx >= habits.length) return; // skip total row label
+      const streak = streakFor(idx);
+      const streakEl = td.querySelector('.streak');
+      if(streak > 0){
+        if(streakEl) streakEl.textContent = streak + ' day streak';
+        else {
+          const span = document.createElement('span');
+          span.className = 'streak';
+          span.textContent = streak + ' day streak';
+          td.insertBefore(span, td.querySelector('.rm'));
+        }
+      } else if(streakEl){
+        streakEl.remove();
+      }
+    });
+  }
+
+  function renderStats(nd){
+    const t = new Date(); t.setHours(0,0,0,0);
+    const viewingCurrentMonth = t.getFullYear()===current.getFullYear() && t.getMonth()===current.getMonth();
+    const daysSoFar = viewingCurrentMonth ? t.getDate() : nd;
+
+    let totalPossible = 0, totalDone = 0;
+    for(let day=1; day<=daysSoFar; day++){
+      habits.forEach((_, hIdx) => {
+        totalPossible++;
+        if(monthData[hIdx+'-'+day]) totalDone++;
+      });
+    }
+    const overallPct = totalPossible ? Math.round((totalDone/totalPossible)*100) : 0;
+
+    let bestStreak = 0, bestHabit = '—';
+    habits.forEach((h, hIdx) => {
+      const s = streakFor(hIdx);
+      if(s > bestStreak){ bestStreak = s; bestHabit = h; }
+    });
+
+    let perfectDays = 0;
+    for(let day=1; day<=daysSoFar; day++){
+      const doneCount = habits.reduce((acc, _, hIdx) => acc + (monthData[hIdx+'-'+day] ? 1 : 0), 0);
+      if(habits.length && doneCount === habits.length) perfectDays++;
+    }
+
+    statStrip.innerHTML = `
+      <div class="stat"><div class="num">${overallPct}%</div><div class="lbl">Completion so far</div></div>
+      <div class="stat"><div class="num">${bestStreak}</div><div class="lbl">Longest active streak${bestStreak>0 ? ' · '+escapeHtml(bestHabit) : ''}</div></div>
+      <div class="stat"><div class="num">${perfectDays}</div><div class="lbl">Perfect days</div></div>
+      <div class="stat"><div class="num">${habits.length}</div><div class="lbl">Habits tracked</div></div>
+    `;
+  }
+
+  function renderCharts(nd){
+    const labels = Array.from({length: nd}, (_, i) => i+1);
+    const dailyPct = labels.map(day => {
+      const doneCount = habits.reduce((acc, _, hIdx) => acc + (monthData[hIdx+'-'+day] ? 1 : 0), 0);
+      return habits.length ? Math.round((doneCount/habits.length)*100) : 0;
+    });
+    const habitTotals = habits.map((_, hIdx) => {
+      let c = 0;
+      for(let day=1; day<=nd; day++) if(monthData[hIdx+'-'+day]) c++;
+      return c;
+    });
+
+    const gridColor = 'rgba(255,255,255,0.06)';
+    const textColor = '#9aa1a8';
+
+    if(lineChart) lineChart.destroy();
+    lineChart = new Chart(document.getElementById('lineChart'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          data: dailyPct,
+          borderColor: '#c9a66b',
+          backgroundColor: 'rgba(201,166,107,0.12)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 2,
+          pointBackgroundColor: '#c9a66b',
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display:false } },
+        scales: {
+          x: { grid: { color: gridColor }, ticks: { color: textColor, font:{size:10} } },
+          y: { min:0, max:100, grid: { color: gridColor }, ticks: { color: textColor, font:{size:10}, callback:v=>v+'%' } }
+        }
+      }
+    });
+
+    if(barChart) barChart.destroy();
+    barChart = new Chart(document.getElementById('barChart'), {
+      type: 'bar',
+      data: {
+        labels: habits.map(h => h.length > 14 ? h.slice(0,13)+'…' : h),
+        datasets: [{
+          data: habitTotals,
+          backgroundColor: '#6fa88a',
+          borderRadius: 4,
+          maxBarThickness: 22,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display:false } },
+        scales: {
+          x: { grid: { color: gridColor }, ticks: { color: textColor, font:{size:10}, precision:0 } },
+          y: { grid: { display:false }, ticks: { color: textColor, font:{size:10} } }
+        }
+      }
+    });
+  }
+
+  document.getElementById('prevMonth').addEventListener('click', async () => {
+    current.setMonth(current.getMonth()-1);
+    await loadMonth();
+    render();
+  });
+  document.getElementById('nextMonth').addEventListener('click', async () => {
+    current.setMonth(current.getMonth()+1);
+    await loadMonth();
+    render();
+  });
+  document.getElementById('addHabitBtn').addEventListener('click', addHabit);
+  document.getElementById('newHabitInput').addEventListener('keydown', (e) => {
+    if(e.key === 'Enter') addHabit();
+  });
+  async function addHabit(){
+    const input = document.getElementById('newHabitInput');
+    const val = input.value.trim();
+    if(!val) return;
+    habits.push(val);
+    input.value = '';
+    await saveHabitList();
+    render();
+  }
+
+  (async function init(){
+    await loadHabitList();
+    await loadMonth();
+    render();
+  })();
+})();
+</script>
+</body>
+</html>

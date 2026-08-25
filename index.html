@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Discipline Ledger</title>
+<meta name="theme-color" content="#14171a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ledger">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg: #14171a;
+    --panel: #1c2024;
+    --panel-2: #21262b;
+    --line: #2c3238;
+    --ink: #ece7dd;
+    --ink-dim: #9aa1a8;
+    --brass: #c9a66b;
+    --brass-dim: #8a7350;
+    --sage: #6fa88a;
+    --sage-dim: #395044;
+    --miss: #3a3f44;
+    --danger: #b5654f;
+    --radius: 10px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;}
+  html,body{
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection{ background: var(--brass); color:#14171a; }
+
+  .wrap{
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 20px 80px;
+    padding-top: max(28px, env(safe-area-inset-top));
+  }
+
+  /* ---------- Header ---------- */
+  header{
+    display:flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 16px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 20px;
+    margin-bottom: 26px;
+  }
+  .brand-eyebrow{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--brass);
+    margin: 0 0 6px;
+  }
+  h1{
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 34px;
+    letter-spacing: -0.01em;
+    margin: 0;
+    color: var(--ink);
+  }
+  .sub{
+    font-size: 13px;
+    color: var(--ink-dim);
+    margin-top: 6px;
+    max-width: 46ch;
+  }
+  .header-right{
+    display:flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+  }
+  .header-actions{ display:flex; align-items:center; gap:8px; }
+  .month-control{
+    display:flex;
+    align-items:center;
+    gap: 10px;
+    font-family:'IBM Plex Mono', monospace;
+  }
+  .icon-btn, .month-control button{
+    width: 32px; height:32px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--panel-2);
+    color: var(--ink);
+    cursor: pointer;
+    font-size: 15px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .icon-btn:hover, .month-control button:hover{ border-color: var(--brass); color: var(--brass); }
+  .month-label{
+    font-size: 15px;
+    letter-spacing: 0.03em;
+    min-width: 150px;
+    text-align:center;
+  }
+  .sync-pill{
+    display:flex; align-items:center; gap:7px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-dim);
+    border: 1px solid var(--line);
+    background: var(--panel-2);
+    border-radius: 999px;
+    padding: 5px 11px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .sync-pill:hover{ border-color: var(--brass); }
+  .sync-dot{ width:8px; height:8px; border-radius:50%; background: var(--miss); flex:none; }
+  .sync-pill.ok    .sync-dot{ background: var(--sage); }
+  .sync-pill.busy  .sync-dot{ background: var(--brass); animation: pulse 1s infinite; }
+  .sync-pill.dirty .sync-dot{ background: var(--brass); }
+  .sync-pill.err   .sync-dot{ background: var(--danger); }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.3;} }
+
+  /* ---------- Stat strip ---------- */
+  .stats{
+    display:grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 26px;
+  }
+  @media (max-width: 640px){ .stats{ grid-template-columns: repeat(2, 1fr); } }
+  .stat{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+  .stat .num{
+    font-family:'Space Grotesk', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--brass);
+    line-height: 1;
+  }
+  .stat .lbl{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-top: 6px;
+  }
+
+  /* ---------- Grid panel ---------- */
+  .panel{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-bottom: 22px;
+    overflow-x: auto;
+  }
+  .panel h2{
+    font-family:'Space Grotesk', sans-serif;
+    font-size: 15px;
+    margin: 0 0 14px;
+    color: var(--ink);
+    display:flex; align-items:center; gap:8px;
+  }
+  .panel h2 .n{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    color: var(--brass-dim);
+    letter-spacing: 0.08em;
+  }
+
+  table.grid{
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 760px;
+  }
+  table.grid th, table.grid td{
+    text-align: center;
+    padding: 0;
+  }
+  .habit-col{
+    text-align:left !important;
+    padding: 8px 10px !important;
+    font-size: 13px;
+    white-space: nowrap;
+    position: sticky;
+    left: 0;
+    background: var(--panel);
+    z-index: 2;
+    border-right: 1px solid var(--line);
+    min-width: 190px;
+  }
+  .habit-col .streak{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--brass);
+    margin-left: 6px;
+  }
+  .habit-col .rm{
+    float:right;
+    color: var(--ink-dim);
+    cursor:pointer;
+    font-size: 12px;
+    opacity: 0;
+    transition: opacity .15s;
+  }
+  tr:hover .rm{ opacity: 1; }
+  .habit-col .rm:hover{ color: var(--danger); }
+
+  .day-head{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    color: var(--ink-dim);
+    width: 26px;
+    padding: 6px 0 !important;
+    border-bottom: 1px solid var(--line);
+  }
+  .day-head.today{ color: var(--brass); font-weight:700; }
+  .day-head.weekend{ color: #b08a5c; }
+
+  .cell{
+    width: 26px; height: 30px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--line);
+  }
+  .cell .box{
+    width: 18px; height: 18px;
+    margin: 0 auto;
+    border-radius: 4px;
+    border: 1px solid var(--miss);
+    background: transparent;
+    transition: all .12s ease;
+  }
+  .cell.today .box{ border-color: var(--brass-dim); }
+  .cell.done .box{
+    background: var(--sage);
+    border-color: var(--sage);
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.15);
+  }
+  .cell:active .box{ transform: scale(0.85); }
+  .cell.future{ cursor: default; }
+  .cell.future .box{ opacity: 0.3; }
+
+  tr.total-row td{ padding-top: 10px; }
+  .total-row .habit-col{ font-weight: 600; color: var(--brass); font-size: 12px; }
+  .total-row .pct{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-dim);
+    padding-top: 4px;
+  }
+
+  /* ---------- Notes row ---------- */
+  .note-row .habit-col{ font-weight:600; color: var(--sage); font-size:12px; }
+  .note-cell{ width:26px; height:26px; cursor:pointer; }
+  .note-cell .dot{
+    width:7px; height:7px; border-radius:50%;
+    margin: 0 auto;
+    background: transparent;
+    border: 1px solid var(--miss);
+    transition: all .12s ease;
+  }
+  .note-cell.has .dot{ background: var(--sage); border-color: var(--sage); }
+  .note-cell.today .dot{ border-color: var(--brass); }
+  .note-cell.future{ cursor:default; }
+  .note-cell.future .dot{ opacity:.3; }
+
+  /* ---------- Add habit ---------- */
+  .add-row{
+    display:flex;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .add-row input{
+    flex:1;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    border-radius: 6px;
+    padding: 9px 12px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+  }
+  .add-row input:focus{ outline: none; border-color: var(--brass); }
+  .btn{
+    background: var(--brass);
+    color: #14171a;
+    border: none;
+    border-radius: 6px;
+    padding: 9px 16px;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: 'IBM Plex Sans', sans-serif;
+  }
+  .btn:hover{ background: #dabb85; }
+  .btn.ghost{
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--line);
+  }
+  .btn.ghost:hover{ border-color: var(--brass); color: var(--brass); background: transparent; }
+  .btn.danger{ background: var(--danger); color: #14171a; }
+  .btn.danger:hover{ background: #c9765f; }
+
+  /* ---------- Charts ---------- */
+  .charts{
+    display:grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 18px;
+  }
+  @media (max-width: 800px){ .charts{ grid-template-columns: 1fr; } }
+  .chart-box{ height: 220px; position: relative; }
+
+  footer{
+    margin-top: 28px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-dim);
+    text-align: center;
+  }
+  footer .flame{ color: var(--brass); }
+
+  .loading-note{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-dim);
+    margin-bottom: 14px;
+  }
+
+  /* ---------- Modals ---------- */
+  .overlay{
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: none;
+    align-items: center; justify-content: center;
+    padding: 20px;
+    z-index: 50;
+  }
+  .overlay.open{ display:flex; }
+  .modal{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 22px;
+    width: 100%;
+    max-width: 440px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal h3{
+    font-family:'Space Grotesk', sans-serif;
+    margin: 0 0 4px;
+    font-size: 18px;
+  }
+  .modal .modal-sub{
+    color: var(--ink-dim);
+    font-size: 12px;
+    margin: 0 0 18px;
+    font-family:'IBM Plex Mono', monospace;
+  }
+  .modal label, .modal-label-static{
+    display:block;
+    font-size: 11px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    font-family:'IBM Plex Mono', monospace;
+    margin: 14px 0 6px;
+  }
+  .modal input[type=text],
+  .modal input[type=password],
+  .modal textarea{
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
+  }
+  .modal textarea{ min-height: 140px; resize: vertical; line-height: 1.5; }
+  .modal input:focus, .modal textarea:focus{ outline:none; border-color: var(--brass); }
+  .modal-actions{
+    display:flex; gap: 8px; justify-content: flex-end;
+    margin-top: 20px; flex-wrap: wrap;
+  }
+  .modal-actions .spacer{ flex:1; }
+  .field-hint{ font-size: 11px; color: var(--ink-dim); margin-top: 6px; line-height: 1.5; }
+  .status-line{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    margin-bottom: 4px;
+  }
+  .status-line.ok{ color: var(--sage); border-color: var(--sage-dim); }
+  .status-line.err{ color: var(--danger); }
+  .warn-box{
+    background: rgba(181,101,79,0.12);
+    border: 1px solid var(--danger);
+    color: #e0a692;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 12px;
+    line-height: 1.5;
+    margin-top: 14px;
+  }
+  .divider{ border:none; border-top:1px solid var(--line); margin: 20px 0; }
+  .hidden{ display:none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <p class="brand-eyebrow">Self&#8209;Mastery / Daily Ledger</p>
+      <h1>Discipline Ledger</h1>
+      <p class="sub">Mark what you did today. The streak is the only opponent.</p>
+    </div>
+    <div class="header-right">
+      <div class="header-actions">
+        <div class="sync-pill" id="syncPill" title="Sync settings">
+          <span class="sync-dot"></span><span id="syncText">Local only</span>
+        </div>
+        <button class="icon-btn" id="settingsBtn" title="Settings">&#9881;</button>
+      </div>
+      <div class="month-control">
+        <button id="prevMonth">&#8592;</button>
+        <div class="month-label" id="monthLabel">—</div>
+        <button id="nextMonth">&#8594;</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="stats" id="statStrip"></div>
+
+  <div class="panel">
+    <h2>This month <span class="n" id="rangeNote"></span></h2>
+    <p class="loading-note" id="loadingNote">loading your ledger…</p>
+    <table class="grid" id="gridTable" style="display:none;"></table>
+    <div class="add-row">
+      <input id="newHabitInput" type="text" placeholder="Add a new habit…" maxlength="40" aria-label="Add a new habit">
+      <button class="btn" id="addHabitBtn">Add</button>
+    </div>
+  </div>
+
+  <div class="charts">
+    <div class="panel">
+      <h2>Daily completion <span class="n">% of habits done, per day</span></h2>
+      <div class="chart-box"><canvas id="lineChart"></canvas></div>
+    </div>
+    <div class="panel">
+      <h2>Totals by habit <span class="n">this month</span></h2>
+      <div class="chart-box"><canvas id="barChart"></canvas></div>
+    </div>
+  </div>
+
+  <footer><span class="flame">&#9670;</span> Saved on your device. Cloud sync is optional &amp; end&#8209;to&#8209;end encrypted.</footer>
+</div>
+
+<!-- Note editor modal -->
+<div class="overlay" id="noteOverlay">
+  <div class="modal">
+    <h3 id="noteTitle">Daily log</h3>
+    <p class="modal-sub" id="noteDateLabel"></p>
+    <textarea id="noteText" placeholder="What happened today? Keep it short — a line or two." aria-label="Daily log note"></textarea>
+    <div class="modal-actions">
+      <button class="btn danger" id="noteDelete">Delete</button>
+      <span class="spacer"></span>
+      <button class="btn ghost" id="noteCancel">Cancel</button>
+      <button class="btn" id="noteSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings / sync modal -->
+<div class="overlay" id="settingsOverlay">
+  <div class="modal">
+    <h3>Cloud sync</h3>
+    <p class="modal-sub">Encrypted backup via a private GitHub Gist</p>
+
+    <div class="status-line" id="syncStatusLine">Not connected — data stays on this device.</div>
+
+    <label for="gistToken">GitHub token <span style="text-transform:none;">(fine-grained, “Gists: Read and write”)</span></label>
+    <input type="password" id="gistToken" placeholder="github_pat_…" autocomplete="off">
+
+    <label for="gistId">Gist ID <span style="text-transform:none;">(optional — auto-created if blank)</span></label>
+    <input type="text" id="gistId" placeholder="leave blank on first device" autocomplete="off">
+
+    <label for="passphrase">Encryption passphrase</label>
+    <input type="password" id="passphrase" placeholder="used to encrypt before upload" autocomplete="off">
+    <div class="field-hint">The same passphrase must be used on every device. It never leaves your device.</div>
+
+    <div class="warn-box" id="passWarn">
+      ⚠ There is no recovery. If you forget this passphrase, the cloud copy cannot be decrypted. Write it down somewhere safe.
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn danger" id="disconnectBtn">Disconnect</button>
+      <span class="spacer"></span>
+      <button class="btn ghost" id="settingsCancel">Close</button>
+      <button class="btn" id="connectBtn">Connect &amp; sync</button>
+    </div>
+
+    <hr class="divider">
+    <p class="modal-label-static">Offline backup file</p>
+    <div class="field-hint">A local JSON backup you can save or move between devices manually.</div>
+    <div class="modal-actions" style="justify-content:flex-start;">
+      <button class="btn ghost" id="exportBtn">Export JSON</button>
+      <button class="btn ghost" id="importBtn">Import JSON</button>
+      <input type="file" id="importFile" accept="application/json" class="hidden" aria-label="Import backup file">
+    </div>
+  </div>
+</div>
+
+<!-- Unlock modal -->
+<div class="overlay" id="unlockOverlay">
+  <div class="modal">
+    <h3>Unlock ledger</h3>
+    <p class="modal-sub">Enter your passphrase to sync this device</p>
+    <div class="status-line" id="unlockError" style="display:none;"></div>
+    <label for="unlockPass">Passphrase</label>
+    <input type="password" id="unlockPass" placeholder="your encryption passphrase" autocomplete="off">
+    <div class="modal-actions">
+      <button class="btn ghost" id="unlockSkip">Skip (offline)</button>
+      <button class="btn" id="unlockBtn">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<!-- Conflict modal -->
+<div class="overlay" id="conflictOverlay">
+  <div class="modal">
+    <h3>Sync conflict</h3>
+    <p class="modal-sub">This device and the cloud both changed since the last sync.</p>
+    <div class="status-line" id="conflictInfo"></div>
+    <div class="field-hint">Choose which version to keep. The other will be overwritten.</div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="keepCloud">Keep Cloud</button>
+      <button class="btn" id="keepLocal">Keep Local</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* =========================================================
+     Constants & schema
+  ========================================================= */
+  const DEFAULT_HABITS = [
+    "Skin care","Exercise","Apply medicine","Study something new",
+    "40 push-ups","40 sit-ups","Read book","Stay calm in bad situations",
+    "Bath","No smoking","No masturbation"
+  ];
+  const DB_NAME = 'disciplineLedger';
+  const DB_VERSION = 1;
+  const SCHEMA_VERSION = 1;
+  const GIST_FILE = 'ledger.json';
+  const SYNC_DEBOUNCE_MS = 3000;
+
+  /* =========================================================
+     IndexedDB layer
+  ========================================================= */
+  let _db = null;
+  function openDB(){
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if(!db.objectStoreNames.contains('habits')) db.createObjectStore('habits', { keyPath:'id' });
+        if(!db.objectStoreNames.contains('entries')){
+          const s = db.createObjectStore('entries', { keyPath:'id' });
+          s.createIndex('date', 'date', { unique:false });
+          s.createIndex('habitId', 'habitId', { unique:false });
+        }
+        if(!db.objectStoreNames.contains('notes')) db.createObjectStore('notes', { keyPath:'date' });
+        if(!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath:'key' });
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  function reqP(req){ return new Promise((res, rej) => { req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); }); }
+  function store(name, mode='readonly'){ return _db.transaction(name, mode).objectStore(name); }
+  function getAll(name){ return reqP(store(name).getAll()); }
+
+  function metaGet(key){ return reqP(store('meta').get(key)).then(r => r ? r.value : undefined); }
+  function metaSet(key, value){
+    const s = store('meta', 'readwrite');
+    return reqP(s.put({ key, value }));
+  }
+
+  async function getHabits(){
+    const h = await getAll('habits');
+    return h.sort((a,b) => (a.order||0) - (b.order||0));
+  }
+  async function addHabit(name){
+    const habits = await getHabits();
+    const order = habits.length ? Math.max(...habits.map(h => h.order||0)) + 1 : 0;
+    const habit = { id: crypto.randomUUID(), name, order };
+    await reqP(store('habits','readwrite').put(habit));
+    return habit;
+  }
+  async function removeHabit(id){
+    await reqP(store('habits','readwrite').delete(id));
+    // delete this habit's entries via the habitId index — no reindexing needed
+    const idx = store('entries','readwrite').index('habitId');
+    const keys = await reqP(idx.getAllKeys(IDBKeyRange.only(id)));
+    const s = store('entries','readwrite');
+    await Promise.all(keys.map(k => reqP(s.delete(k))));
+  }
+
+  function entryId(date, habitId){ return date + '|' + habitId; }
+  async function setEntry(date, habitId, done){
+    const s = store('entries','readwrite');
+    if(done) return reqP(s.put({ id: entryId(date, habitId), date, habitId, completed:true }));
+    return reqP(s.delete(entryId(date, habitId)));
+  }
+  async function getMonthEntries(ym){
+    const idx = store('entries').index('date');
+    const range = IDBKeyRange.bound(ym + '-01', ym + '-31');
+    const rows = await reqP(idx.getAll(range));
+    const set = new Set();
+    rows.forEach(r => set.add(r.habitId + '|' + r.date));
+    return set;
+  }
+  async function getMonthNotes(ym){
+    const all = await getAll('notes');
+    const map = {};
+    all.forEach(n => { if(n.date.slice(0,7) === ym) map[n.date] = n.text; });
+    return map;
+  }
+  async function setNote(date, text){
+    const s = store('notes','readwrite');
+    if(text && text.trim()) return reqP(s.put({ date, text: text.trim(), updatedAt: new Date().toISOString() }));
+    return reqP(s.delete(date));
+  }
+
+  async function serializeAll(){
+    const [habits, entries, notes] = await Promise.all([ getAll('habits'), getAll('entries'), getAll('notes') ]);
+    return { habits, entries, notes };
+  }
+  async function replaceAll(data){
+    const tx = _db.transaction(['habits','entries','notes'], 'readwrite');
+    const clear = n => reqP(tx.objectStore(n).clear());
+    await Promise.all([ clear('habits'), clear('entries'), clear('notes') ]);
+    (data.habits || []).forEach(h => tx.objectStore('habits').put(h));
+    (data.entries || []).forEach(e => tx.objectStore('entries').put(e));
+    (data.notes || []).forEach(n => tx.objectStore('notes').put(n));
+    return new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+  }
+
+  /* =========================================================
+     Crypto layer (AES-GCM + PBKDF2)
+  ========================================================= */
+  function b64(bytes){ let s=''; const b=new Uint8Array(bytes); for(let i=0;i<b.length;i++) s+=String.fromCharCode(b[i]); return btoa(s); }
+  function ub64(str){ const bin=atob(str); const out=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) out[i]=bin.charCodeAt(i); return out; }
+
+  async function deriveKey(passphrase, salt, iterations){
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey(
+      { name:'PBKDF2', salt, iterations, hash:'SHA-256' },
+      base, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']
+    );
+  }
+  async function encryptData(obj, passphrase){
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const iterations = 200000;
+    const key = await deriveKey(passphrase, salt, iterations);
+    const ct = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, new TextEncoder().encode(JSON.stringify(obj)));
+    return { kdf:{ salt:b64(salt), iterations }, iv:b64(iv), ciphertext:b64(ct) };
+  }
+  async function decryptData(payload, passphrase){
+    const key = await deriveKey(passphrase, ub64(payload.kdf.salt), payload.kdf.iterations);
+    const pt = await crypto.subtle.decrypt({ name:'AES-GCM', iv:ub64(payload.iv) }, key, ub64(payload.ciphertext));
+    return JSON.parse(new TextDecoder().decode(pt));
+  }
+
+  /* =========================================================
+     GitHub Gist adapter
+  ========================================================= */
+  function ghHeaders(){
+    return { 'Authorization':'Bearer '+sync.token, 'Accept':'application/vnd.github+json', 'Content-Type':'application/json' };
+  }
+  async function gistCreate(content){
+    const r = await fetch('https://api.github.com/gists', {
+      method:'POST', headers:ghHeaders(),
+      body: JSON.stringify({ description:'Discipline Ledger (encrypted)', public:false, files:{ [GIST_FILE]:{ content } } })
+    });
+    if(!r.ok) throw new Error('Gist create failed ('+r.status+')');
+    return (await r.json()).id;
+  }
+  async function gistRead(id){
+    const r = await fetch('https://api.github.com/gists/'+id, { headers: ghHeaders() });
+    if(r.status === 404) return null;
+    if(!r.ok) throw new Error('Gist read failed ('+r.status+')');
+    const j = await r.json();
+    const f = j.files && j.files[GIST_FILE];
+    return f ? f.content : null;
+  }
+  async function gistUpdate(id, content){
+    const r = await fetch('https://api.github.com/gists/'+id, {
+      method:'PATCH', headers:ghHeaders(),
+      body: JSON.stringify({ files:{ [GIST_FILE]:{ content } } })
+    });
+    if(!r.ok) throw new Error('Gist update failed ('+r.status+')');
+  }
+
+  /* =========================================================
+     Sync engine (versioned, last-write-wins with conflict prompt)
+  ========================================================= */
+  const sync = {
+    token: null, gistId: null, passphrase: null, deviceId: null,
+    version: 0, baseVersion: 0, dirty: false, lastSyncedAt: null,
+    pushTimer: null, busy: false
+  };
+
+  function configured(){ return !!(sync.token && sync.passphrase); }
+  function canSync(){ return configured() && navigator.onLine; }
+
+  async function loadSyncMeta(){
+    sync.token = await metaGet('github-token') || null;
+    sync.gistId = await metaGet('gist-id') || null;
+    sync.deviceId = await metaGet('device-id');
+    if(!sync.deviceId){ sync.deviceId = crypto.randomUUID(); await metaSet('device-id', sync.deviceId); }
+    const m = await metaGet('sync-meta') || {};
+    sync.version = m.version || 0;
+    sync.baseVersion = m.baseVersion || 0;
+    sync.lastSyncedAt = m.lastSyncedAt || null;
+  }
+  function saveSyncMeta(){
+    return metaSet('sync-meta', { version:sync.version, baseVersion:sync.baseVersion, lastSyncedAt:sync.lastSyncedAt });
+  }
+
+  function markDirty(){
+    sync.version++;
+    sync.dirty = true;
+    saveSyncMeta();
+    updateSyncPill();
+    if(canSync()){
+      clearTimeout(sync.pushTimer);
+      sync.pushTimer = setTimeout(() => { pushNow().catch(err => setSyncError(err)); }, SYNC_DEBOUNCE_MS);
+    }
+  }
+
+  function buildEnvelope(payload){
+    return JSON.stringify({
+      schema: SCHEMA_VERSION, version: sync.version,
+      updatedAt: new Date().toISOString(), deviceId: sync.deviceId,
+      kdf: payload.kdf, iv: payload.iv, ciphertext: payload.ciphertext
+    });
+  }
+
+  async function pushNow(){
+    if(!canSync() || sync.busy) return;
+    sync.busy = true; updateSyncPill('busy');
+    try{
+      const data = await serializeAll();
+      const payload = await encryptData(data, sync.passphrase);
+      const content = buildEnvelope(payload);
+      if(!sync.gistId){ sync.gistId = await gistCreate(content); await metaSet('gist-id', sync.gistId); }
+      else await gistUpdate(sync.gistId, content);
+      sync.baseVersion = sync.version;
+      sync.dirty = false;
+      sync.lastSyncedAt = new Date().toISOString();
+      await saveSyncMeta();
+      updateSyncPill('ok');
+    } finally { sync.busy = false; }
+  }
+
+  async function pull(){
+    if(!canSync() || sync.busy) return;
+    sync.busy = true; updateSyncPill('busy');
+    try{
+      if(!sync.gistId){ sync.busy = false; if(sync.dirty) return pushNow(); return; }
+      const raw = await gistRead(sync.gistId);
+      if(!raw){ sync.busy = false; return pushNow(); }
+      const remote = JSON.parse(raw);
+      const rv = remote.version || 0;
+
+      if(rv <= sync.baseVersion){
+        // cloud has nothing newer than our common base
+        if(sync.dirty){ sync.busy = false; return pushNow(); }
+        updateSyncPill('ok');
+      } else if(!sync.dirty){
+        // cloud advanced, we have no local changes -> take cloud
+        await applyRemote(remote);
+        updateSyncPill('ok');
+      } else {
+        // both changed since last sync -> conflict
+        sync.busy = false;
+        openConflict(remote);
+        return;
+      }
+    } finally { sync.busy = false; }
+  }
+
+  async function applyRemote(remote){
+    const data = await decryptData(remote, sync.passphrase);
+    await replaceAll(data);
+    sync.version = remote.version || 0;
+    sync.baseVersion = sync.version;
+    sync.dirty = false;
+    sync.lastSyncedAt = new Date().toISOString();
+    await saveSyncMeta();
+    await loadMonth();
+    render();
+  }
+
+  function setSyncError(err){
+    console.error(err);
+    updateSyncPill('err', (err && err.message) ? err.message : 'Sync error');
+  }
+
+  /* =========================================================
+     App state & date helpers
+  ========================================================= */
+  let current = new Date(); current.setDate(1);
+  let habits = [];
+  let entrySet = new Set();   // "habitId|YYYY-MM-DD"
+  let notesMap = {};          // "YYYY-MM-DD" -> text
+  let lineChart, barChart;
+
+  const p2 = n => String(n).padStart(2,'0');
+  function monthKey(d){ return d.getFullYear() + '-' + p2(d.getMonth()+1); }
+  function isoOf(d, day){ return d.getFullYear() + '-' + p2(d.getMonth()+1) + '-' + p2(day); }
+  function daysInMonth(d){ return new Date(d.getFullYear(), d.getMonth()+1, 0).getDate(); }
+  function isToday(d, day){ const t=new Date(); return t.getFullYear()===d.getFullYear() && t.getMonth()===d.getMonth() && t.getDate()===day; }
+  function isFuture(d, day){ const t=new Date(); t.setHours(0,0,0,0); return new Date(d.getFullYear(), d.getMonth(), day) > t; }
+  function done(habitId, date){ return entrySet.has(habitId + '|' + date); }
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  const el = id => document.getElementById(id);
+  const gridTable = el('gridTable');
+  const loadingNote = el('loadingNote');
+  const statStrip = el('statStrip');
+  const rangeNote = el('rangeNote');
+  const monthLabel = el('monthLabel');
+
+  async function loadMonth(){
+    const ym = monthKey(current);
+    [entrySet, notesMap] = await Promise.all([ getMonthEntries(ym), getMonthNotes(ym) ]);
+  }
+
+  function streakFor(habitId){
+    const nd = daysInMonth(current);
+    const t = new Date(); t.setHours(0,0,0,0);
+    const viewingCurrent = t.getFullYear()===current.getFullYear() && t.getMonth()===current.getMonth();
+    let day = viewingCurrent ? t.getDate() : nd;
+    let streak = 0;
+    while(day >= 1){
+      if(done(habitId, isoOf(current, day))){ streak++; day--; } else break;
+    }
+    return streak;
+  }
+
+  /* =========================================================
+     Rendering
+  ========================================================= */
+  function render(){
+    monthLabel.textContent = current.toLocaleDateString('en-US', { month:'long', year:'numeric' });
+    const nd = daysInMonth(current);
+    rangeNote.textContent = '1–' + nd;
+
+    let html = '<thead><tr><th class="habit-col">Habit</th>';
+    for(let day=1; day<=nd; day++){
+      const dow = new Date(current.getFullYear(), current.getMonth(), day).getDay();
+      const weekend = (dow===0 || dow===6);
+      html += `<th class="day-head ${isToday(current,day)?'today':''} ${weekend?'weekend':''}">${day}</th>`;
+    }
+    html += '</tr></thead><tbody>';
+
+    habits.forEach(h => {
+      const streak = streakFor(h.id);
+      html += `<tr><td class="habit-col">${escapeHtml(h.name)}${streak>0?`<span class="streak">${streak} day streak</span>`:''}<span class="rm" data-h="${h.id}" title="Remove habit">✕</span></td>`;
+      for(let day=1; day<=nd; day++){
+        const date = isoOf(current, day);
+        const fut = isFuture(current, day);
+        html += `<td class="cell ${done(h.id,date)?'done':''} ${fut?'future':''} ${isToday(current,day)?'today':''}" data-h="${h.id}" data-date="${date}"><div class="box"></div></td>`;
+      }
+      html += '</tr>';
+    });
+
+    // daily total row
+    html += `<tr class="total-row"><td class="habit-col">Daily total</td>`;
+    for(let day=1; day<=nd; day++){
+      const date = isoOf(current, day);
+      const doneCount = habits.reduce((a,h) => a + (done(h.id,date)?1:0), 0);
+      const pct = habits.length ? Math.round((doneCount/habits.length)*100) : 0;
+      html += `<td class="pct">${pct}%</td>`;
+    }
+    html += '</tr>';
+
+    // diary notes row
+    html += `<tr class="note-row"><td class="habit-col">Daily log</td>`;
+    for(let day=1; day<=nd; day++){
+      const date = isoOf(current, day);
+      const has = !!notesMap[date];
+      const fut = isFuture(current, day);
+      html += `<td class="note-cell ${has?'has':''} ${fut?'future':''} ${isToday(current,day)?'today':''}" data-date="${date}" title="${has?'Edit note':'Add note'}"><div class="dot"></div></td>`;
+    }
+    html += '</tr></tbody>';
+
+    gridTable.innerHTML = html;
+    attachHandlers();
+    renderStats(nd);
+    renderCharts(nd);
+  }
+
+  function attachHandlers(){
+    gridTable.querySelectorAll('.cell').forEach(cell => {
+      if(cell.classList.contains('future')) return;
+      cell.addEventListener('click', async () => {
+        const habitId = cell.dataset.h, date = cell.dataset.date;
+        const nowDone = !done(habitId, date);
+        await setEntry(date, habitId, nowDone);
+        if(nowDone) entrySet.add(habitId + '|' + date); else entrySet.delete(habitId + '|' + date);
+        cell.classList.toggle('done', nowDone);
+        markDirty();
+        renderStats(daysInMonth(current));
+        renderCharts(daysInMonth(current));
+        refreshStreaks();
+      });
+    });
+    gridTable.querySelectorAll('.rm').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.h;
+        const habit = habits.find(h => h.id === id);
+        if(!habit || !confirm('Remove "'+habit.name+'" from your habit list?')) return;
+        await removeHabit(id);
+        habits = await getHabits();
+        await loadMonth();
+        markDirty();
+        render();
+      });
+    });
+    gridTable.querySelectorAll('.note-cell').forEach(cell => {
+      if(cell.classList.contains('future')) return;
+      cell.addEventListener('click', () => openNote(cell.dataset.date));
+    });
+  }
+
+  function refreshStreaks(){
+    const rows = gridTable.querySelectorAll('tbody tr');
+    habits.forEach((h, i) => {
+      const td = rows[i] && rows[i].querySelector('.habit-col');
+      if(!td) return;
+      const streak = streakFor(h.id);
+      let span = td.querySelector('.streak');
+      if(streak > 0){
+        if(span) span.textContent = streak + ' day streak';
+        else { span = document.createElement('span'); span.className='streak'; span.textContent = streak+' day streak'; td.insertBefore(span, td.querySelector('.rm')); }
+      } else if(span){ span.remove(); }
+    });
+  }
+
+  function renderStats(nd){
+    const t = new Date(); t.setHours(0,0,0,0);
+    const viewingCurrent = t.getFullYear()===current.getFullYear() && t.getMonth()===current.getMonth();
+    const daysSoFar = viewingCurrent ? t.getDate() : nd;
+
+    let possible=0, doneN=0;
+    for(let day=1; day<=daysSoFar; day++){
+      const date = isoOf(current, day);
+      habits.forEach(h => { possible++; if(done(h.id,date)) doneN++; });
+    }
+    const overallPct = possible ? Math.round((doneN/possible)*100) : 0;
+
+    let bestStreak=0, bestHabit='—';
+    habits.forEach(h => { const s = streakFor(h.id); if(s>bestStreak){ bestStreak=s; bestHabit=h.name; } });
+
+    let perfectDays=0;
+    for(let day=1; day<=daysSoFar; day++){
+      const date = isoOf(current, day);
+      const c = habits.reduce((a,h)=>a+(done(h.id,date)?1:0),0);
+      if(habits.length && c===habits.length) perfectDays++;
+    }
+
+    statStrip.innerHTML = `
+      <div class="stat"><div class="num">${overallPct}%</div><div class="lbl">Completion so far</div></div>
+      <div class="stat"><div class="num">${bestStreak}</div><div class="lbl">Longest active streak${bestStreak>0?' · '+escapeHtml(bestHabit):''}</div></div>
+      <div class="stat"><div class="num">${perfectDays}</div><div class="lbl">Perfect days</div></div>
+      <div class="stat"><div class="num">${habits.length}</div><div class="lbl">Habits tracked</div></div>`;
+  }
+
+  function renderCharts(nd){
+    const labels = Array.from({length:nd}, (_,i)=>i+1);
+    const dailyPct = labels.map(day => {
+      const date = isoOf(current, day);
+      const c = habits.reduce((a,h)=>a+(done(h.id,date)?1:0),0);
+      return habits.length ? Math.round((c/habits.length)*100) : 0;
+    });
+    const habitTotals = habits.map(h => {
+      let c=0; for(let day=1; day<=nd; day++) if(done(h.id, isoOf(current,day))) c++; return c;
+    });
+    const gridColor='rgba(255,255,255,0.06)', textColor='#9aa1a8';
+
+    if(lineChart) lineChart.destroy();
+    lineChart = new Chart(el('lineChart'), {
+      type:'line',
+      data:{ labels, datasets:[{ data:dailyPct, borderColor:'#c9a66b', backgroundColor:'rgba(201,166,107,0.12)', fill:true, tension:0.3, pointRadius:2, pointBackgroundColor:'#c9a66b' }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+        scales:{ x:{grid:{color:gridColor},ticks:{color:textColor,font:{size:10}}}, y:{min:0,max:100,grid:{color:gridColor},ticks:{color:textColor,font:{size:10},callback:v=>v+'%'}} } }
+    });
+
+    if(barChart) barChart.destroy();
+    barChart = new Chart(el('barChart'), {
+      type:'bar',
+      data:{ labels: habits.map(h => h.name.length>14 ? h.name.slice(0,13)+'…' : h.name),
+        datasets:[{ data:habitTotals, backgroundColor:'#6fa88a', borderRadius:4, maxBarThickness:22 }] },
+      options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+        scales:{ x:{grid:{color:gridColor},ticks:{color:textColor,font:{size:10},precision:0}}, y:{grid:{display:false},ticks:{color:textColor,font:{size:10}}} } }
+    });
+  }
+
+  /* =========================================================
+     Note editor
+  ========================================================= */
+  let noteDate = null;
+  function openNote(date){
+    noteDate = date;
+    const d = new Date(date + 'T00:00:00');
+    el('noteDateLabel').textContent = d.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+    el('noteText').value = notesMap[date] || '';
+    el('noteDelete').style.display = notesMap[date] ? '' : 'none';
+    el('noteOverlay').classList.add('open');
+    setTimeout(() => el('noteText').focus(), 50);
+  }
+  function closeNote(){ el('noteOverlay').classList.remove('open'); noteDate = null; }
+  async function saveNote(){
+    if(!noteDate) return;
+    const text = el('noteText').value;
+    await setNote(noteDate, text);
+    if(text && text.trim()) notesMap[noteDate] = text.trim(); else delete notesMap[noteDate];
+    markDirty();
+    closeNote();
+    render();
+  }
+  async function deleteNote(){
+    if(!noteDate) return;
+    await setNote(noteDate, '');
+    delete notesMap[noteDate];
+    markDirty();
+    closeNote();
+    render();
+  }
+
+  /* =========================================================
+     Sync UI
+  ========================================================= */
+  function fmtTime(iso){ if(!iso) return '—'; const d=new Date(iso); return d.toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); }
+  function updateSyncPill(state, msg){
+    const pill = el('syncPill'), text = el('syncText');
+    pill.classList.remove('ok','busy','dirty','err');
+    if(!configured()){ text.textContent = 'Local only'; return; }
+    if(state === 'busy'){ pill.classList.add('busy'); text.textContent = 'Syncing…'; return; }
+    if(state === 'err'){ pill.classList.add('err'); text.textContent = msg || 'Sync error'; return; }
+    if(sync.dirty || state === 'dirty'){ pill.classList.add('dirty'); text.textContent = 'Unsynced'; return; }
+    pill.classList.add('ok'); text.textContent = 'Synced ' + fmtTime(sync.lastSyncedAt);
+  }
+  function updateSettingsStatus(){
+    const line = el('syncStatusLine');
+    if(!configured()){ line.className='status-line'; line.textContent = 'Not connected — data stays on this device.'; return; }
+    line.className = 'status-line ok';
+    line.textContent = 'Connected' + (sync.gistId ? ' · gist '+sync.gistId.slice(0,8)+'…' : '') + ' · last sync ' + fmtTime(sync.lastSyncedAt);
+  }
+
+  function openSettings(){
+    el('gistToken').value = sync.token || '';
+    el('gistId').value = sync.gistId || '';
+    el('passphrase').value = sync.passphrase || '';
+    updateSettingsStatus();
+    el('settingsOverlay').classList.add('open');
+  }
+  function closeSettings(){ el('settingsOverlay').classList.remove('open'); }
+
+  async function connectSync(){
+    const token = el('gistToken').value.trim();
+    const gistId = el('gistId').value.trim();
+    const passphrase = el('passphrase').value;
+    if(!token || !passphrase){ alert('Token and passphrase are required.'); return; }
+    sync.token = token;
+    sync.gistId = gistId || sync.gistId || null;
+    sync.passphrase = passphrase;
+    await metaSet('github-token', token);
+    if(sync.gistId) await metaSet('gist-id', sync.gistId);
+    updateSyncPill();
+    try{
+      await pull();
+      if(sync.dirty) await pushNow();
+      updateSettingsStatus();
+      updateSyncPill('ok');
+      closeSettings();
+    }catch(err){ setSyncError(err); updateSettingsStatus(); alert('Could not sync: ' + err.message); }
+  }
+
+  async function disconnectSync(){
+    if(!confirm('Disconnect sync and remove the token from this device? Your local data stays.')) return;
+    sync.token = null; sync.passphrase = null;
+    await metaSet('github-token', null);
+    updateSyncPill();
+    updateSettingsStatus();
+    closeSettings();
+  }
+
+  /* =========================================================
+     Conflict resolution
+  ========================================================= */
+  let conflictRemote = null;
+  function openConflict(remote){
+    conflictRemote = remote;
+    el('conflictInfo').textContent = 'Cloud version ' + (remote.version||0) + ' · updated ' + fmtTime(remote.updatedAt) + (remote.deviceId===sync.deviceId ? ' (this device)' : ' (other device)');
+    el('conflictOverlay').classList.add('open');
+    updateSyncPill('dirty');
+  }
+  async function resolveConflict(keepLocal){
+    el('conflictOverlay').classList.remove('open');
+    try{
+      if(keepLocal){ await pushNow(); }
+      else { await applyRemote(conflictRemote); }
+    }catch(err){ setSyncError(err); }
+    conflictRemote = null;
+  }
+
+  /* =========================================================
+     Export / Import
+  ========================================================= */
+  async function exportJson(){
+    const data = await serializeAll();
+    const out = { version: SCHEMA_VERSION, exportedAt: new Date().toISOString(), habits:data.habits, entries:data.entries, notes:data.notes };
+    const blob = new Blob([JSON.stringify(out, null, 2)], { type:'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'discipline-ledger-backup-' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+  function migrate(data){
+    // v1 is the current schema; future versions can transform here based on data.version
+    return { habits:data.habits||[], entries:data.entries||[], notes:data.notes||[] };
+  }
+  async function importJson(file){
+    const text = await file.text();
+    let parsed;
+    try{ parsed = JSON.parse(text); }catch(_){ alert('That file is not valid JSON.'); return; }
+    if(!confirm('Import will replace all current data on this device. Continue?')) return;
+    const data = migrate(parsed);
+    await replaceAll(data);
+    habits = await getHabits();
+    await loadMonth();
+    markDirty();
+    render();
+    closeSettings();
+  }
+
+  /* =========================================================
+     Wiring
+  ========================================================= */
+  el('prevMonth').addEventListener('click', async () => { current.setMonth(current.getMonth()-1); await loadMonth(); render(); });
+  el('nextMonth').addEventListener('click', async () => { current.setMonth(current.getMonth()+1); await loadMonth(); render(); });
+
+  el('addHabitBtn').addEventListener('click', addHabitFromInput);
+  el('newHabitInput').addEventListener('keydown', e => { if(e.key==='Enter') addHabitFromInput(); });
+  async function addHabitFromInput(){
+    const input = el('newHabitInput');
+    const val = input.value.trim();
+    if(!val) return;
+    await addHabit(val);
+    input.value = '';
+    habits = await getHabits();
+    markDirty();
+    render();
+  }
+
+  el('noteSave').addEventListener('click', saveNote);
+  el('noteCancel').addEventListener('click', closeNote);
+  el('noteDelete').addEventListener('click', deleteNote);
+
+  el('settingsBtn').addEventListener('click', openSettings);
+  el('syncPill').addEventListener('click', () => { if(canSync()) pull().catch(setSyncError); else openSettings(); });
+  el('settingsCancel').addEventListener('click', closeSettings);
+  el('connectBtn').addEventListener('click', connectSync);
+  el('disconnectBtn').addEventListener('click', disconnectSync);
+
+  el('exportBtn').addEventListener('click', exportJson);
+  el('importBtn').addEventListener('click', () => el('importFile').click());
+  el('importFile').addEventListener('change', e => { if(e.target.files[0]) importJson(e.target.files[0]); e.target.value=''; });
+
+  el('keepLocal').addEventListener('click', () => resolveConflict(true));
+  el('keepCloud').addEventListener('click', () => resolveConflict(false));
+
+  el('unlockBtn').addEventListener('click', doUnlock);
+  el('unlockSkip').addEventListener('click', () => el('unlockOverlay').classList.remove('open'));
+  el('unlockPass').addEventListener('keydown', e => { if(e.key==='Enter') doUnlock(); });
+  async function doUnlock(){
+    const pass = el('unlockPass').value;
+    if(!pass) return;
+    sync.passphrase = pass;
+    try{
+      el('unlockError').style.display = 'none';
+      await pull();
+      el('unlockOverlay').classList.remove('open');
+      el('unlockPass').value = '';
+      updateSyncPill();
+    }catch(err){
+      sync.passphrase = null;
+      const box = el('unlockError');
+      box.style.display = ''; box.className = 'status-line err';
+      box.textContent = (err && /operation-specific|decrypt/i.test(err.name+err.message)) ? 'Wrong passphrase.' : ('Could not unlock: ' + err.message);
+    }
+  }
+
+  // close overlays on backdrop click
+  document.querySelectorAll('.overlay').forEach(o => o.addEventListener('click', e => { if(e.target === o && o.id !== 'unlockOverlay' && o.id !== 'conflictOverlay') o.classList.remove('open'); }));
+
+  window.addEventListener('online', () => { updateSyncPill(); if(canSync()) pull().catch(setSyncError); });
+  window.addEventListener('offline', () => updateSyncPill());
+
+  /* =========================================================
+     Init
+  ========================================================= */
+  async function init(){
+    _db = await openDB();
+    await loadSyncMeta();
+
+    habits = await getHabits();
+    if(habits.length === 0){
+      for(const name of DEFAULT_HABITS) await addHabit(name);
+      habits = await getHabits();
+    }
+
+    await loadMonth();
+    loadingNote.style.display = 'none';
+    gridTable.style.display = '';
+    render();
+    updateSyncPill();
+
+    // if sync is configured on this device, ask for the passphrase to unlock + pull
+    if(sync.token){ el('unlockOverlay').classList.add('open'); setTimeout(() => el('unlockPass').focus(), 60); }
+  }
+
+  init().catch(err => {
+    console.error(err);
+    loadingNote.textContent = 'Failed to load: ' + err.message;
+  });
+
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(()=>{}));
+  }
+})();
+</script>
+</body>
+</html>
